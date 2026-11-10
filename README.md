@@ -1,59 +1,111 @@
-# utilis.py 
-GitHub Copilot: # utils.py
+# Transformer Machine Translation from Scratch in PyTorch
 
-This is a utility file that contains helper functions for our main implementation. It includes a `PositionWiseFeedForward` class and two functions: `create_padding_mask` and `create_look_ahead_mask`.
+A complete PyTorch implementation of the **Encoder-Decoder Transformer architecture** from scratch (based on Vaswani et al., *"Attention Is All You Need"*), applied to English-to-French Neural Machine Translation (NMT).
 
-# encoder.py
+## Overview
 
-This file contains the implementation of the Encoder module. It includes a `EncoderLayer` class and an `Encoder` class.
+This repository contains a modular implementation of the Transformer model without relying on high-level prebuilt transformer libraries (`nn.Transformer`). Every component—including scaled dot-product attention, multi-head attention projections, sinusoidal positional encodings, masked autoregressive decoding, and position-wise feed-forward networks—is built directly using core PyTorch tensor operations.
 
+---
 
-# decoder.py
+## Architecture Design
 
-This file contains the implementation of the Decoder module. It includes a `DecoderLayer` class and a `Decoder` class.
+```
+                     [Target Output (French)]
+                               │
+                       [Shifted Right]
+                               │
+                       [Output Embedding]
+                               │
+                 ┌─────────────▼─────────────┐
+                 │    + Positional Encoding  │
+                 └─────────────┬─────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Masked Multi-Head   │
+                    │   Self-Attention    │
+                    └──────────┬──────────┘
+                               │ (Add & Norm)
+                               ▼
+[Source (English)]  ┌─────────────────────┐
+        │           │ Cross Multi-Head    │<─── [Encoder Output]
+ [Input Embedding]  │      Attention      │
+        │           └──────────┬──────────┘
+┌───────▼────────┐             │ (Add & Norm)
+│+ Pos Encoding  │             ▼
+└───────┬────────┘  ┌─────────────────────┐
+        │           │ Feed-Forward Net    │
+┌───────▼────────┐  └──────────┬──────────┘
+│ Encoder Layer  │             │ (Add & Norm)
+│  (Nx = 6)      │             ▼
+└───────┬────────┘       [Linear Head]
+        │                      │
+        └────────────────> [Softmax] ──> Output Tokens
+```
 
-# train.py
+### Key Components
 
-This file contains the training loop for our model. It includes functions for training and validating the model, and transformers model architecture.
+1. **Scaled Dot-Product Multi-Head Attention** (`utils.py`):
+   $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+   Projects queries, keys, and values across $h = 8$ parallel attention heads ($d_k = d_v = 64$).
+2. **Sinusoidal Positional Encoding** (`utils.py`):
+   Injects deterministic sequence order information into input embeddings using alternating sine and cosine functions across dimensions.
+3. **Dual Masking Mechanism** (`utils.py`):
+   - **Padding Mask**: Zeroes out attention weights for padding tokens (`<pad>`) across source and target batches.
+   - **Look-Ahead Mask**: Lower-triangular masking ensuring autoregressive causality in the decoder during training.
+4. **Deep 6-Layer Stacks** (`encoder.py`, `decoder.py`):
+   - 6 Encoder layers and 6 Decoder layers with Layer Normalization and Residual Skip Connections.
+   - Position-Wise Feed-Forward Networks with hidden dimension $d_{ff} = 2048$.
 
-## Instructions on how to execute the file
+---
 
-You can execute this file from the command line as follows:
+## Model Configuration & Hyperparameters
 
+| Hyperparameter | Value | Description |
+| :--- | :--- | :--- |
+| **Model Dimension ($d_{\text{model}}$)** | 512 | Embedding and hidden representation dimension |
+| **Number of Layers ($N$)** | 6 | Identical encoder and decoder stacked layers |
+| **Attention Heads ($h$)** | 8 | Parallel multi-head attention projections |
+| **Feed-Forward Dim ($d_{ff}$)** | 2048 | Inner dense layer expansion dimension |
+| **Max Sequence Length** | 100 | Maximum input/target sequence cutoff |
+| **Dropout** | 0.2 | Regularization across attention and residual connections |
+| **Batch Size** | 64 | Training mini-batch size |
+| **Optimizer** | Adam | $\beta_1 = 0.9, \beta_2 = 0.98, \epsilon = 10^{-9}$ |
+| **Learning Rate** | 1e-4 | Peak learning rate with warmup |
+
+---
+
+## Repository Structure
+
+```
+├── encoder.py              # EncoderLayer and 6-layer Encoder stack
+├── decoder.py              # DecoderLayer with masked self-attention & cross-attention
+├── utils.py                # MultiHeadAttention, PositionalEncoding, Masking utilities
+├── train.py                # Training loop, data preprocessing & tokenization
+├── test.py                 # Greedy autoregressive inference & BLEU evaluation
+├── transformers_best.ipynb # Interactive end-to-end training & evaluation notebook
+├── testbleu.txt            # Generated sample translations vs. ground truth references
+├── Report.pdf              # Comprehensive technical report
+└── README.md               # Project documentation
+```
+
+---
+
+## Getting Started
+
+### 1. Requirements
+```bash
+pip install torch torchvision nltk numpy tqdm matplotlib
+```
+
+### 2. Training
 ```bash
 python train.py
 ```
 
-This will start the training process using the parameters defined in the file.
-
-## Implementation Assumptions
-
-1. The file assumes that the necessary data files are available in the specified paths.
-2. The model parameters and hyperparameters are defined within the file. If you want to change these, you will need to edit the file.
-
-# test.py
-
-This file contains the testing loop for our model. It includes functions for loading the trained model and evaluating it on the test data.
-
-## Instructions on how to execute the file
-
-You can execute this file from the command line as follows:
-
+### 3. Evaluation (BLEU Score)
 ```bash
 python test.py
 ```
-
-This will start the testing process using the trained model and test data.
-
-## Implementation Assumptions
-
-1. The file assumes that a trained model is available at the specified path.
-2. The test data is available at the specified path.
-
-Next steps:
-- Ensure your data files are in the correct locations
-- Check the model parameters and hyperparameters in train.py
-- Verify that a trained model is available for testing in test.py
-
-# One drive link
-`https://iiitaphyd-my.sharepoint.com/:f:/g/personal/prudhvinadh_k_students_iiit_ac_in/EuuOTEWHUihMkUsYyNbNrjUBIS0yFvojXSECuyIegN1ppQ?e=Vle3Nf`
+Evaluates candidate translations against reference French sentences using NLTK BLEU score with smoothing functions.
